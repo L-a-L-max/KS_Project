@@ -13,6 +13,52 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 KS_JS_PATH = os.path.join(SCRIPT_DIR, "ks.js")
 
 device_scripts = {}
+_compiled_bundle = None
+
+
+def compile_script():
+    global _compiled_bundle
+    if _compiled_bundle is not None:
+        return _compiled_bundle
+
+    print("[Frida] === 编译Frida脚本 (Frida 17.x需要编译Java bridge) ===")
+    print(f"[Frida] 脚本路径: {KS_JS_PATH}")
+    print(f"[Frida] 项目根目录: {SCRIPT_DIR}")
+
+    node_modules = os.path.join(SCRIPT_DIR, "node_modules", "frida-java-bridge")
+    if not os.path.exists(node_modules):
+        print(f"[Frida] *** 错误: frida-java-bridge未安装! ***")
+        print(f"[Frida] *** 请在scripts目录执行: npm install ***")
+        print(f"[Frida] *** 或者: npm install frida-java-bridge ***")
+        raise Exception(
+            "frida-java-bridge未安装。"
+            "Frida 17.x不再自动包含Java bridge，需要手动安装。"
+            f"请在 {SCRIPT_DIR} 目录执行: npm install"
+        )
+
+    compiler = frida.Compiler()
+
+    diag_messages = []
+    def on_diagnostics(diag):
+        diag_messages.append(diag)
+        print(f"[Frida][Compiler] {diag}")
+
+    compiler.on("diagnostics", on_diagnostics)
+
+    try:
+        bundle = compiler.build(
+            os.path.basename(KS_JS_PATH),
+            project_root=SCRIPT_DIR
+        )
+        print(f"[Frida] 脚本编译成功 (bundle大小: {len(bundle)} bytes)")
+        _compiled_bundle = bundle
+        return bundle
+    except Exception as e:
+        print(f"[Frida] *** 脚本编译失败: {e} ***")
+        if diag_messages:
+            for msg in diag_messages:
+                print(f"[Frida][Compiler] {msg}")
+        raise
 
 
 def print_diagnostics(device):
@@ -22,42 +68,14 @@ def print_diagnostics(device):
     print(f"[Diag] 设备类型: {device.type}")
     print(f"[Diag] 设备ID: {device.id}")
     print(f"[Diag] 设备名称: {device.name}")
+    major_ver = int(frida.__version__.split('.')[0])
+    if major_ver >= 17:
+        print(f"[Diag] Frida {frida.__version__} (>=17.0): Java bridge需要通过frida.Compiler()编译")
     try:
         params = device.query_system_parameters()
         print(f"[Diag] 系统参数: {json.dumps(params, indent=2, ensure_ascii=False)}")
     except Exception as e:
         print(f"[Diag] 获取系统参数失败: {e}")
-    try:
-        result = subprocess.run(['adb', 'shell', 'getprop', 'ro.product.cpu.abi'],
-                                capture_output=True, text=True, timeout=5)
-        print(f"[Diag] 设备CPU ABI: {result.stdout.strip()}")
-    except Exception as e:
-        print(f"[Diag] 获取CPU ABI失败: {e}")
-    try:
-        result = subprocess.run(['adb', 'shell', 'getprop', 'ro.build.version.sdk'],
-                                capture_output=True, text=True, timeout=5)
-        print(f"[Diag] Android SDK版本: {result.stdout.strip()}")
-    except Exception as e:
-        print(f"[Diag] 获取SDK版本失败: {e}")
-    try:
-        result = subprocess.run(
-            ['adb', 'shell', 'su', '-c', '/data/local/tmp/frida-server --version'],
-            capture_output=True, text=True, timeout=5)
-        server_ver = result.stdout.strip() or result.stderr.strip()
-        print(f"[Diag] frida-server版本: {server_ver}")
-        if server_ver and server_ver != frida.__version__:
-            print(f"[Diag] *** 警告: frida-server版本({server_ver})与Python frida版本({frida.__version__})不匹配! ***")
-            print(f"[Diag] *** 这是导致Java不可用的常见原因! ***")
-            print(f"[Diag] *** 请下载匹配版本: https://github.com/frida/frida/releases/tag/{frida.__version__} ***")
-    except Exception as e:
-        print(f"[Diag] 获取frida-server版本失败: {e}")
-    try:
-        result = subprocess.run(
-            ['adb', 'shell', 'su', '-c', 'file /data/local/tmp/frida-server'],
-            capture_output=True, text=True, timeout=5)
-        print(f"[Diag] frida-server文件信息: {result.stdout.strip()}")
-    except Exception:
-        pass
     print("[Diag] === 诊断结束 ===")
 
 
@@ -89,61 +107,6 @@ def try_connect_device(device_id):
     raise Exception("无法连接Frida设备。请确保frida-server正在运行且adb已连接。")
 
 
-def check_modules_for_java(device, pid, proc_name):
-    print(f"[Diag] 检查进程 {proc_name}(PID:{pid}) 的模块...")
-    try:
-        session = device.attach(pid)
-        check_code = """
-var modules = Process.enumerateModules();
-var javaModules = [];
-var totalCount = modules.length;
-for (var i = 0; i < modules.length; i++) {
-    var m = modules[i];
-    var n = m.name.toLowerCase();
-    if (n.indexOf('art') !== -1 || n.indexOf('dvm') !== -1 ||
-        n.indexOf('dalvik') !== -1 || n.indexOf('java') !== -1 ||
-        n.indexOf('jvm') !== -1) {
-        javaModules.push(m.name + ' @ ' + m.base);
-    }
-}
-var result = {
-    arch: Process.arch,
-    platform: Process.platform,
-    pid: Process.id,
-    fridaVersion: Frida.version,
-    totalModules: totalCount,
-    javaModules: javaModules,
-    javaType: typeof Java,
-    javaDefined: typeof Java !== 'undefined'
-};
-send(JSON.stringify(result));
-"""
-        diag_result = {"data": None}
-
-        def on_msg(message, data):
-            if message.get('type') == 'send':
-                diag_result["data"] = message.get('payload')
-
-        check_script = session.create_script(check_code)
-        check_script.on('message', on_msg)
-        check_script.load()
-        time.sleep(1.5)
-        check_script.unload()
-        session.detach()
-
-        if diag_result["data"]:
-            info = json.loads(diag_result["data"])
-            print(f"[Diag]   进程架构: {info.get('arch')}")
-            print(f"[Diag]   平台: {info.get('platform')}")
-            print(f"[Diag]   Frida JS版本: {info.get('fridaVersion')}")
-            print(f"[Diag]   总模块数: {info.get('totalModules')}")
-            print(f"[Diag]   Java相关模块: {info.get('javaModules')}")
-            print(f"[Diag]   typeof Java: {info.get('javaType')}")
-            print(f"[Diag]   Java可用: {info.get('javaDefined')}")
-            return info
-    except Exception as e:
-        print(f"[Diag]   模块检查失败: {e}")
-    return None
 
 
 def attach_and_load(device, device_id):
@@ -168,18 +131,7 @@ def attach_and_load(device, device_id):
         elif p.name in ("com.kuaishou.nebula", "com.smile.gifmaker"):
             attach_targets.append(p)
 
-    for proc in attach_targets:
-        diag_info = check_modules_for_java(device, proc.pid, proc.name)
-        if diag_info and not diag_info.get("javaDefined"):
-            java_mods = diag_info.get("javaModules", [])
-            if not java_mods:
-                print(f"[Frida] 进程 {proc.name} 无Java相关模块，跳过")
-                continue
-            else:
-                print(f"[Frida] 进程 {proc.name} 有Java模块但Java对象未定义，仍尝试加载脚本")
-
-    with open(KS_JS_PATH, "r", encoding="utf-8") as f:
-        script_code = f.read()
+    script_code = compile_script()
 
     for proc in attach_targets:
         print(f"\n[Frida] === 尝试attach并加载脚本: {proc.name} (PID: {proc.pid}) ===")
@@ -258,7 +210,8 @@ def attach_and_load(device, device_id):
         session = device.attach(pid)
         print(f"[Frida] attach到spawn进程成功")
 
-        script = session.create_script(script_code)
+        spawn_script_code = compile_script()
+        script = session.create_script(spawn_script_code)
         rpc_state = {"ready": False, "error": None}
 
         def on_message_spawn(message, data):

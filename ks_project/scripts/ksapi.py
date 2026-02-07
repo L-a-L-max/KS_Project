@@ -91,44 +91,30 @@ def get_script_for_device(device_id):
         target_name = None
         target_pid = None
         
-        # 方法1: 优先查找包名主进程（必须优先，因为只有主进程包含Java运行时）
+        # 步骤1: 优先查找中文名进程（参考工作的win版实现，直接attach"快手极速版"）
         priority_names = ["com.kuaishou.nebula", "com.smile.gifmaker"]
-        print(f"[Frida] === 步骤1: 优先查找包名主进程 {priority_names} ===")
-        # 先检查所有进程，看看是否有主进程
-        found_main = False
+        print(f"[Frida] === 步骤1: 优先查找'快手极速版'进程（参考工作版本） ===")
         for p in processes:
             n = p.name
-            if n in priority_names:
-                found_main = True
-                print(f"[Frida]   发现主进程: {n} (PID: {p.pid})")
+            if "快手" in n and ":" not in n:
+                target_name = n
+                target_pid = p.pid
+                print(f"[Frida] ✓ 找到快手进程: {target_name} (PID: {target_pid})")
+                break
         
-        if found_main:
-            # 再次遍历，选择主进程
+        # 步骤2: 如果没找到中文名进程，查找包名主进程
+        if not target_name:
+            print(f"[Frida] === 步骤2: 查找包名主进程 {priority_names} ===")
             for p in processes:
                 n = p.name
                 if n in priority_names:
                     target_name = n
                     target_pid = p.pid
-                    print(f"[Frida] ✓ 选择包名主进程: {target_name} (PID: {target_pid})")
-                    print(f"[Frida]   这是包含Java运行时的主进程，将优先使用")
+                    print(f"[Frida] ✓ 找到包名主进程: {target_name} (PID: {target_pid})")
                     break
-        else:
-            print(f"[Frida]   未发现主进程")
         
         if not target_name:
-            print(f"[Frida] ✗ 未找到包名主进程")
-        
-        # 方法2: 如果主进程不存在，才查找中文名"快手极速版"（不推荐，可能不包含Java运行时）
-        if not target_name:
-            print(f"[Frida] === 步骤2: 查找'快手极速版'进程（备选，可能不包含Java运行时） ===")
-            for p in processes:
-                n = p.name
-                if "快手" in n and "极速" in n:
-                    target_name = n
-                    target_pid = p.pid
-                    print(f"[Frida] ⚠ 找到'快手极速版'进程: {target_name} (PID: {target_pid})")
-                    print(f"[Frida] ⚠ 警告：此进程可能不包含Java运行时，建议使用主进程com.kuaishou.nebula")
-                    break
+            print(f"[Frida] ✗ 未找到快手进程")
         
         # 方法3: 通过adb命令查找主进程（如果Frida枚举不到）
         if not target_name:
@@ -206,7 +192,7 @@ def get_script_for_device(device_id):
         if target_name:
             try:
                 print(f"[Frida] 检查进程 {target_name} (PID: {target_pid}) 的Java运行时...")
-                temp_session = device.attach(target_name)
+                temp_session = device.attach(target_pid)
                 # 快速检查Java是否可用
                 test_script_code = "if (typeof Java !== 'undefined') { send('java_ok'); } else { send('java_not_ok'); }"
                 test_script = temp_session.create_script(test_script_code)
@@ -216,7 +202,7 @@ def get_script_for_device(device_id):
                         java_check["result"] = msg['payload']
                 test_script.on('message', check_msg)
                 test_script.load()
-                time.sleep(0.5)  # 增加等待时间，确保脚本执行
+                time.sleep(1.0)
                 test_script.unload()
                 temp_session.detach()
                 
@@ -234,10 +220,10 @@ def get_script_for_device(device_id):
             print(f"[Frida] === 扫描所有进程查找Java运行时 ===")
             for p in processes:
                 # 只检查主进程（不包含冒号的进程名）
-                if (p.name in priority_names or "kuaishou" in p.name.lower() or "nebula" in p.name.lower()) and ":" not in p.name:
+                if (p.name in priority_names or "kuaishou" in p.name.lower() or "nebula" in p.name.lower() or "快手" in p.name) and ":" not in p.name:
                     try:
                         print(f"[Frida]   检查进程: {p.name} (PID: {p.pid})...")
-                        temp_session = device.attach(p.name)
+                        temp_session = device.attach(p.pid)
                         test_script_code = "if (typeof Java !== 'undefined') { send('java_ok'); } else { send('java_not_ok'); }"
                         test_script = temp_session.create_script(test_script_code)
                         java_check = {"result": None}
@@ -246,7 +232,7 @@ def get_script_for_device(device_id):
                                 java_check["result"] = msg['payload']
                         test_script.on('message', check_msg)
                         test_script.load()
-                        time.sleep(0.5)
+                        time.sleep(1.0)
                         test_script.unload()
                         temp_session.detach()
                         
@@ -262,8 +248,8 @@ def get_script_for_device(device_id):
         
         if java_available_process:
             print(f"[Frida] ✓ 使用包含Java运行时的进程: {java_available_process}")
-            session = device.attach(java_available_process)
-            print(f"[Frida] Successfully attached to {java_available_process}")
+            session = device.attach(target_pid)
+            print(f"[Frida] Successfully attached to {java_available_process} (PID: {target_pid})")
         else:
             print(f"[Frida] ⚠ 未找到包含Java运行时的进程")
             print(f"[Frida] 尝试使用spawn方式重新启动应用...")
@@ -277,66 +263,71 @@ def get_script_for_device(device_id):
                 pid = device.spawn([spawn_pkg])
                 print(f"[Frida] ✓ Spawned {spawn_pkg} with PID {pid}")
                 
-                # 关键修复：先resume让进程启动，然后再attach
-                # 如果在resume之前attach，session可能锁定进程的早期状态，无法看到后续加载的Java运行时
-                device.resume(pid)
-                print(f"[Frida] ✓ Resumed process, waiting for process to start...")
-                
-                # 等待进程启动（给进程一些时间开始运行）
-                time.sleep(3)
-                
-                # 现在attach到已经运行的进程
-                print(f"[Frida] Attaching to running process (PID: {pid})...")
+                # 关键修复：spawn模式下先attach再resume
+                # 这样脚本可以在进程启动前加载，Java.perform会自动等待VM就绪
                 session = device.attach(pid)
-                print(f"[Frida] ✓ Attached to process")
+                print(f"[Frida] ✓ Attached to spawned process")
                 
-                # 使用轮询方式等待Java运行时初始化
-                max_wait_time = 30  # 最多等待30秒
-                check_interval = 1  # 每1秒检查一次
-                elapsed_time = 0
-                java_ready = False
-                
-                print(f"[Frida] Waiting for Java runtime to initialize...")
-                while elapsed_time < max_wait_time and not java_ready:
-                    try:
-                        # 创建一个临时脚本来检查Java是否可用
-                        test_script_code = """
-                        if (typeof Java !== 'undefined') {
-                            send('java_ok');
-                        } else {
-                            send('java_not_ok');
-                        }
-                        """
-                        test_script = session.create_script(test_script_code)
-                        java_check = {"result": None}
-                        def check_msg(msg, data):
-                            if msg['type'] == 'send':
-                                java_check["result"] = msg['payload']
-                        test_script.on('message', check_msg)
-                        test_script.load()
-                        time.sleep(0.5)  # 给脚本一点时间执行
-                        test_script.unload()
-                        
-                        if java_check["result"] == "java_ok":
-                            java_ready = True
-                            print(f"[Frida] ✓ Java运行时已就绪（等待了 {elapsed_time} 秒）")
-                            break
-                        else:
-                            print(f"[Frida]   等待Java运行时初始化... ({elapsed_time}/{max_wait_time}秒)")
-                    except Exception as e:
-                        # 如果检查失败，继续等待（可能是进程还在启动中）
-                        print(f"[Frida]   检查Java时出错（可能还在启动中）: {e}")
+                # 在spawn模式下，先加载ks.js脚本，再resume进程
+                # 这样Java.perform()的回调会在Java VM初始化后自动执行
+                if os.path.exists(KS_JS_PATH):
+                    with open(KS_JS_PATH, "r", encoding="utf-8") as f:
+                        spawn_script_code = f.read()
+                    script = session.create_script(spawn_script_code)
+                    rpc_ready_spawn = {"ready": False}
+                    def on_message_spawn(message, data):
+                        try:
+                            msg_type = message.get('type')
+                            payload = message.get('payload')
+                            if msg_type == 'send':
+                                if payload == 'rpc_ready':
+                                    rpc_ready_spawn["ready"] = True
+                                    print("[Frida] RPC methods ready (spawn mode)")
+                                else:
+                                    print(f"[Frida] {payload}")
+                            elif msg_type == 'error':
+                                print(f"[Frida] Error: {message.get('description', message)}")
+                        except Exception as e:
+                            print(f"[Frida] Message parse error: {e}")
+                    script.on('message', on_message_spawn)
+                    print(f"[Frida] Loading script before resume (spawn mode)...")
+                    script.load()
                     
-                    time.sleep(check_interval)
-                    elapsed_time += check_interval
+                    # 现在resume进程，Java.perform回调会在VM就绪后自动执行
+                    print(f"[Frida] Resuming process...")
+                    device.resume(pid)
+                    
+                    # 等待RPC就绪
+                    max_wait_spawn = 45
+                    elapsed_spawn = 0
+                    while not rpc_ready_spawn["ready"] and elapsed_spawn < max_wait_spawn:
+                        time.sleep(1)
+                        elapsed_spawn += 1
+                        if elapsed_spawn % 5 == 0:
+                            print(f"[Frida]   等待RPC就绪... ({elapsed_spawn}/{max_wait_spawn}秒)")
+                    
+                    if rpc_ready_spawn["ready"]:
+                        print(f"[Frida] ✓ Spawn模式成功，RPC已就绪")
+                    else:
+                        print(f"[Frida] ⚠ Spawn模式超时，继续尝试...")
+                    
+                    # 验证并返回
+                    try:
+                        ping_result = script.exports_sync.ping()
+                        print(f"[Frida] ✓ RPC ping: {ping_result}")
+                        exports = [x for x in dir(script.exports_sync) if not x.startswith('_')]
+                        print(f"[Frida] ✓ Available RPC methods: {exports}")
+                    except Exception as ve:
+                        print(f"[Frida] ⚠ RPC验证失败: {ve}")
+                    
+                    device_scripts[device_id] = script
+                    return script
                 
-                if not java_ready:
-                    print(f"[Frida] ⚠ 警告：等待 {max_wait_time} 秒后Java运行时仍未就绪")
-                    print(f"[Frida]   可能的原因：")
-                    print(f"[Frida]   1. 应用启动失败或崩溃")
-                    print(f"[Frida]   2. 进程架构问题（32位/64位不匹配）")
-                    print(f"[Frida]   3. Frida连接方式问题（建议使用USB/ADB连接）")
-                    print(f"[Frida]   继续尝试加载脚本...")
+                # spawn模式下脚本已在上面加载并resume，不应到达此处
+                # 如果到达此处说明KS_JS_PATH不存在，回退到旧逻辑
+                print(f"[Frida] ⚠ Spawn回退：脚本文件不存在，使用resume后等待方式")
+                device.resume(pid)
+                time.sleep(5)
                 
                 target_name = spawn_pkg
                 target_pid = pid

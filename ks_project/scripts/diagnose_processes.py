@@ -8,14 +8,20 @@ import subprocess
 def main():
     print("=== 快手进程诊断工具 ===\n")
     
-    # 连接设备
+    # 连接设备（优先USB/ADB，回退到远程）
+    device = None
     try:
-        dm = frida.get_device_manager()
-        device = dm.add_remote_device("127.0.0.1:27042")
-        print("✓ 已连接到Frida设备\n")
+        device = frida.get_usb_device(timeout=5)
+        print("✓ 已通过USB/ADB连接到Frida设备\n")
     except Exception as e:
-        print(f"✗ 连接失败: {e}")
-        return
+        print(f"USB连接失败: {e}，尝试远程连接...")
+        try:
+            dm = frida.get_device_manager()
+            device = dm.add_remote_device("127.0.0.1:27042")
+            print("✓ 已通过远程连接到Frida设备\n")
+        except Exception as e2:
+            print(f"✗ 连接失败: {e2}")
+            return
     
     # 枚举所有进程
     processes = device.enumerate_processes()
@@ -32,7 +38,7 @@ def main():
     for p in kuaishou_processes:
         print(f"检查进程: {p.name} (PID: {p.pid})...")
         try:
-            session = device.attach(p.name)
+            session = device.attach(p.pid)
             test_script_code = """
             if (typeof Java !== 'undefined') {
                 send('java_available');
@@ -48,7 +54,7 @@ def main():
             test_script.on('message', on_message)
             test_script.load()
             import time
-            time.sleep(0.3)
+            time.sleep(1.0)
             test_script.unload()
             session.detach()
             

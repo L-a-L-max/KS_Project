@@ -202,76 +202,140 @@ class UserInfo {
         var currentEnc = (type === 606) ? this.boxEncData : this.encData;
         var currentSign = (type === 606) ? this.boxSign : this.sign;
 
+        var adUrl = 'https://api.e.kuaishou.cn/rest/e/reward/mixed/ad';
+
+        console.log('[广告请求] type=' + type);
+        console.log('[广告请求] encData长度: ' + currentEnc.length + ', 前50字符: ' + currentEnc.substring(0, 50));
+        console.log('[广告请求] sign值: ' + currentSign);
+
+        try {
+            var response = await axios({
+                method: 'post',
+                url: adUrl,
+                headers: {
+                    'Host': 'api.e.kuaishou.com',
+                    'Connection': 'keep-alive',
+                    'User-Agent': 'kwai-android aegon/3.56.0',
+                    'Accept-Language': 'zh-cn',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Cookie': 'kuaishou.api_st=' + api_st
+                },
+                data: 'encData=' + encodeURIComponent(currentEnc)
+                    + '&sign=' + encodeURIComponent(currentSign)
+                    + '&client_key=2ac2a76d'
+            });
+            var result = response.data;
+        } catch (error) {
+            if (error.response) {
+                var result = error.response.data;
+                console.log('[广告响应] HTTP ' + error.response.status + ': ' + JSON.stringify(result).substring(0, 300));
+            } else {
+                console.error('[广告请求] 网络错误: ' + error.message);
+                return;
+            }
+        }
+
+        console.log('[广告响应] ' + JSON.stringify(result).substring(0, 300));
+
+        if (result && result.errorMsg == 'OK') {
+            try {
+                var s = result.feeds[0].exp_tag;
+                var parts = s.split('/');
+                var ss = parts[1];
+                var f = ss.split('_')[0];
+
+                var cid = result.feeds[0].ad.creativeId;
+                var llsid = f;
+                var tp = result.feedType;
+
+                console.log('[任务] 获取成功 type=' + type + ', cid=' + cid + ', feedType=' + tp);
+
+                if (tp === 0) {
+                    await this.doSig3(cid, llsid, type, 'video');
+                }
+            } catch (e) {
+                console.log('解析任务数据异常: ' + e.message);
+            }
+        } else if (result) {
+            console.log('获取任务失败: result=' + result.result + ', errorMsg=' + result.errorMsg);
+            if (result.result === 50) {
+                console.log('[诊断] error 50 = 需要sig查询参数，正在重试...');
+                await this.getTaskInfoWithSig(type, currentEnc, currentSign);
+            } else if (result.result === 6001) {
+                console.log('[诊断] error 6001 = encData无效或账号问题');
+            }
+        }
+    }
+
+    async getTaskInfoWithSig(type, currentEnc, currentSign) {
         var postData = 'encData=' + encodeURIComponent(currentEnc)
             + '&sign=' + encodeURIComponent(currentSign)
             + '&client_key=2ac2a76d';
 
         var adPath = '/rest/e/reward/mixed/ad';
 
+        var sig = computeSig(this.query, postData, this.salt);
+        console.log('[重试-sig模式] sig(MD5): ' + sig);
+
+        var sig3Res = await axios.post(BASE_URL + '/nssig3?device=' + DEVICE_ID, { data: adPath + sig });
+        var sig3 = sig3Res.data.result;
+
+        var sigToken = computeNsTokenSig(sig, this.salt);
+
+        var fullUrl = 'https://api.e.kuaishou.cn' + adPath + '?'
+            + this.query
+            + '&sig=' + sig
+            + '&__NS_sig3=' + sig3
+            + '&__NS_xfalcon='
+            + '&__NStokensig=' + sigToken;
+
         try {
-            var sig = computeSig(this.query, postData, this.salt);
-            console.log('[广告签名] sig(MD5): ' + sig);
-
-            var sig3Res = await axios.post(BASE_URL + '/nssig3?device=' + DEVICE_ID, { data: adPath + sig });
-            var sig3 = sig3Res.data.result;
-            console.log('[广告签名] __NS_sig3: ' + sig3);
-
-            var sigToken = computeNsTokenSig(sig, this.salt);
-            console.log('[广告签名] __NStokensig: ' + sigToken);
-
-            var fullUrl = 'https://api.e.kuaishou.cn' + adPath + '?'
-                + this.query
-                + '&sig=' + sig
-                + '&__NS_sig3=' + sig3
-                + '&__NS_xfalcon='
-                + '&__NStokensig=' + sigToken;
-
-            console.log('[广告请求] type=' + type);
-            console.log('[广告请求] URL: ' + fullUrl.substring(0, 120) + '...');
-            console.log('[广告请求] encData前40字符: ' + currentEnc.substring(0, 40));
-            console.log('[广告请求] sign值: ' + currentSign);
-
-            var options = {
+            var response = await axios({
                 method: 'post',
                 url: fullUrl,
-                headers: this.getAdHeaders(),
-                body: postData
-            };
-
-            var result = await httpRequest(options, 'getTaskInfo');
-            console.log('[广告响应] ' + JSON.stringify(result).substring(0, 300));
-
-            if (result.errorMsg == 'OK') {
-                try {
-                    var s = result.feeds[0].exp_tag;
-                    var parts = s.split('/');
-                    var ss = parts[1];
-                    var f = ss.split('_')[0];
-
-                    var cid = result.feeds[0].ad.creativeId;
-                    var llsid = f;
-                    var tp = result.feedType;
-
-                    console.log('[任务] 获取成功 type=' + type + ', cid=' + cid + ', feedType=' + tp);
-
-                    if (tp === 0) {
-                        await this.doSig3(cid, llsid, type, 'video');
-                    }
-                } catch (e) {
-                    console.log('解析任务数据异常: ' + e.message);
-                }
+                headers: {
+                    'Host': 'api.e.kuaishou.com',
+                    'Connection': 'keep-alive',
+                    'User-Agent': 'kwai-android aegon/3.56.0',
+                    'Accept-Language': 'zh-cn',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Cookie': 'kuaishou.api_st=' + api_st
+                },
+                data: postData
+            });
+            var result = response.data;
+        } catch (error) {
+            if (error.response) {
+                var result = error.response.data;
             } else {
-                console.log('获取任务失败: result=' + result.result + ', errorMsg=' + result.errorMsg + ', error_msg=' + result.error_msg);
-                if (result.result === 50) {
-                    console.log('[调试] 签名验证失败 - 可能原因: api_st过期/参数不匹配');
-                }
-                if (result.result === 6001) {
-                    console.log('[调试] 6001错误 - 可能原因: encData内容无效/api_st过期/账号需要激活');
-                    console.log('[调试] 请检查: 1.api_st是否过期 2.快手账号是否正常 3.是否需要重新抓包');
-                }
+                console.error('[重试] 网络错误: ' + error.message);
+                return;
             }
-        } catch (e) {
-            console.error('[广告请求] 异常: ' + e.message);
+        }
+
+        console.log('[重试-sig模式] 响应: ' + JSON.stringify(result).substring(0, 300));
+
+        if (result && result.errorMsg == 'OK') {
+            try {
+                var s = result.feeds[0].exp_tag;
+                var parts = s.split('/');
+                var ss = parts[1];
+                var f = ss.split('_')[0];
+
+                var cid = result.feeds[0].ad.creativeId;
+                var llsid = f;
+                var tp = result.feedType;
+
+                console.log('[任务] 获取成功(sig模式) type=' + type + ', cid=' + cid + ', feedType=' + tp);
+
+                if (tp === 0) {
+                    await this.doSig3(cid, llsid, type, 'video');
+                }
+            } catch (e) {
+                console.log('解析任务数据异常: ' + e.message);
+            }
+        } else if (result) {
+            console.log('[重试] 也失败了: result=' + result.result + ', errorMsg=' + result.errorMsg);
         }
     }
 

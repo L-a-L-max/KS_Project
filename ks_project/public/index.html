@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>快手金币助手控制台</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h1, h2 { color: #333; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        input, select, textarea { width: 100%; padding: 8px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { background-color: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        button:hover { background-color: #0056b3; }
+        button.stop { background-color: #dc3545; }
+        button.stop:hover { background-color: #a71d2a; }
+        .account-item { border: 1px solid #eee; padding: 15px; margin-bottom: 10px; border-radius: 4px; background: #fafafa; }
+        .status-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 12px; margin-left: 10px; }
+        .running { background-color: #28a745; color: white; }
+        .stopped { background-color: #6c757d; color: white; }
+        .row { display: flex; gap: 10px; align-items: center; }
+        .flex-grow { flex-grow: 1; }
+    </style>
+</head>
+<body>
+    <h1>🚀 快手金币助手控制台</h1>
+
+    <div class="card">
+        <h2>全局配置</h2>
+        <div class="row">
+            <div class="flex-grow">
+                <label>任务类型 (Task)</label>
+                <select id="common_Task">
+                    <option value="all">全部 (all)</option>
+                    <option value="food">饭补 (food)</option>
+                    <option value="box">宝箱 (box)</option>
+                    <option value="look">逛街 (look)</option>
+                </select>
+            </div>
+            <div class="flex-grow">
+                <label>金币上限 (COIN_LIMIT)</label>
+                <input type="number" id="common_COIN_LIMIT">
+            </div>
+        </div>
+        <div class="row">
+            <div class="flex-grow">
+                <label>运行轮数 (ROUNDS)</label>
+                <input type="number" id="common_ROUNDS">
+            </div>
+            <div class="flex-grow">
+                <label>低奖励阈值</label>
+                <input type="number" id="common_LOW_REWARD_THRESHOLD">
+            </div>
+        </div>
+        <button onclick="saveConfig()">💾 保存全局配置</button>
+    </div>
+
+    <div class="card">
+        <h2>账号管理</h2>
+        <div id="accountsList"></div>
+        <button onclick="addAccount()">➕ 添加账号</button>
+    </div>
+
+    <script>
+        let config = { accounts: [], common: {} };
+        let devices = [];
+        let runningStatus = {};
+
+        async function init() {
+            await Promise.all([loadConfig(), loadDevices(), loadStatus()]);
+            render();
+            // 轮询状态
+            setInterval(loadStatus, 3000);
+        }
+
+        async function loadConfig() {
+            const res = await fetch('/api/config');
+            config = await res.json();
+            
+            // 填充全局配置
+            document.getElementById('common_Task').value = config.common.Task;
+            document.getElementById('common_COIN_LIMIT').value = config.common.COIN_LIMIT;
+            document.getElementById('common_ROUNDS').value = config.common.ROUNDS;
+            document.getElementById('common_LOW_REWARD_THRESHOLD').value = config.common.LOW_REWARD_THRESHOLD;
+        }
+
+        async function loadDevices() {
+            const res = await fetch('/api/devices');
+            devices = await res.json();
+        }
+
+        async function loadStatus() {
+            const res = await fetch('/api/status');
+            runningStatus = await res.json();
+            updateStatusBadges();
+        }
+
+        function updateStatusBadges() {
+            config.accounts.forEach((_, index) => {
+                const badge = document.getElementById(`status-${index}`);
+                const btn = document.getElementById(`btn-${index}`);
+                if (badge && btn) {
+                    const isRunning = runningStatus[index];
+                    badge.className = `status-badge ${isRunning ? 'running' : 'stopped'}`;
+                    badge.innerText = isRunning ? '运行中' : '已停止';
+                    
+                    btn.className = isRunning ? 'stop' : '';
+                    btn.innerText = isRunning ? '停止' : '启动';
+                    btn.onclick = () => toggleTask(index, isRunning);
+                }
+            });
+        }
+
+        function render() {
+            const list = document.getElementById('accountsList');
+            list.innerHTML = '';
+
+            config.accounts.forEach((acc, index) => {
+                const div = document.createElement('div');
+                div.className = 'account-item';
+                
+                // 构造设备选项
+                const deviceOptions = devices.map(d => `<option value="${d}">${d}</option>`).join('');
+                
+                div.innerHTML = `
+                    <div class="row" style="margin-bottom: 10px;">
+                        <h3>账号 #${index + 1}</h3>
+                        <span id="status-${index}" class="status-badge stopped">已停止</span>
+                        <div style="margin-left: auto;">
+                            <button onclick="deleteAccount(${index})" style="background:#dc3545; padding: 5px 10px;">删除</button>
+                        </div>
+                    </div>
+                    
+                    <label>Cookie (ks)</label>
+                    <textarea id="acc_cookie_${index}" rows="2">${acc.cookie || ''}</textarea>
+                    
+                    <div class="row">
+                        <div class="flex-grow">
+                            <label>Client ID (cid)</label>
+                            <input id="acc_cid_${index}" value="${acc.cid || ''}">
+                        </div>
+                        <div class="flex-grow">
+                            <label>Secret ID (sid)</label>
+                            <input id="acc_sid_${index}" value="${acc.sid || ''}">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="flex-grow">
+                            <label>运行设备</label>
+                            <select id="acc_device_${index}">
+                                ${devices.length > 0 ? deviceOptions : '<option>未检测到设备</option>'}
+                            </select>
+                        </div>
+                        <div class="flex-grow">
+                            <label>&nbsp;</label>
+                            <button id="btn-${index}" onclick="toggleTask(${index}, false)" style="width:100%">启动</button>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function addAccount() {
+            config.accounts.push({ cookie: "", cid: "", sid: "", phid: "" });
+            render();
+            saveConfig();
+        }
+
+        async function deleteAccount(index) {
+            if (confirm('确定删除该账号配置吗？')) {
+                config.accounts.splice(index, 1);
+                await saveConfig();
+                render();
+            }
+        }
+
+        async function saveConfig() {
+            // 更新 common
+            config.common.Task = document.getElementById('common_Task').value;
+            config.common.COIN_LIMIT = parseInt(document.getElementById('common_COIN_LIMIT').value);
+            config.common.ROUNDS = parseInt(document.getElementById('common_ROUNDS').value);
+            config.common.LOW_REWARD_THRESHOLD = parseInt(document.getElementById('common_LOW_REWARD_THRESHOLD').value);
+
+            // 更新 accounts
+            config.accounts.forEach((_, index) => {
+                config.accounts[index].cookie = document.getElementById(`acc_cookie_${index}`).value;
+                config.accounts[index].cid = document.getElementById(`acc_cid_${index}`).value;
+                config.accounts[index].sid = document.getElementById(`acc_sid_${index}`).value;
+                // phid 暂不显示，保留原值
+            });
+
+            await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+            alert('配置已保存');
+        }
+
+        async function toggleTask(index, isRunning) {
+            if (isRunning) {
+                await fetch('/api/stop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accountIndex: index })
+                });
+            } else {
+                // 先保存当前输入
+                config.accounts[index].cookie = document.getElementById(`acc_cookie_${index}`).value;
+                await saveConfig(); // 确保后端拿到最新配置
+
+                const deviceId = document.getElementById(`acc_device_${index}`).value;
+                await fetch('/api/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accountIndex: index, deviceId: deviceId })
+                });
+            }
+            loadStatus();
+        }
+
+        init();
+    </script>
+</body>
+</html>

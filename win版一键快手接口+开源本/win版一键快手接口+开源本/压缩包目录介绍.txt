@@ -1,0 +1,13 @@
+ks-sign-server/
+│
+├── ks.js                     ← Frida Hook 脚本
+├── ksapi.py                  ← Flask 接口服务
+├── requirements.txt          ← Python 依赖
+├── install_deps.bat          ← 安装依赖脚本
+├── push_frida.bat            ← 推送 Frida Server 到手机
+├── start.bat                 ← 一键启动主程序
+├── sig.js                    ← Node.js 生成 sig 和 nstokensig 工具
+├── readme.txt                ← 使用说明
+├── icon/                     ← 可选图标文件夹
+└── assets/
+    └── frida-server-arm64    ← 示例：frida-server（需自行替换为最新版）

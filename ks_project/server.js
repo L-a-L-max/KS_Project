@@ -81,6 +81,8 @@ app.post('/api/run', (req, res) => {
         KS_UID: account.userId || '',
         KS_EGID: account.egid || '',
         KS_DID: account.did || '',
+        KS_APPVER: account.appver || '',
+        KS_MOD: account.mod || '',
         u: 'http://127.0.0.1:5000',
         Task: config.common.Task || 'all',
         COIN_LIMIT: String(config.common.COIN_LIMIT || 550000),

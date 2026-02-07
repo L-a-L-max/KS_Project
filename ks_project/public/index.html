@@ -232,7 +232,7 @@
         }
 
         function parseCookieString(cookieStr) {
-            var result = { api_st: '', userId: '', egid: '', did: '' };
+            var result = { api_st: '', userId: '', egid: '', did: '', appver: '', mod: '' };
             if (!cookieStr) return result;
             cookieStr = cookieStr.replace(/\s+/g, ' ').trim();
             var pairs = cookieStr.split(/;\s*/);
@@ -245,6 +245,8 @@
                 else if (key === 'userId' || key === 'ud') result.userId = result.userId || val;
                 else if (key === 'egid') result.egid = val;
                 else if (key === 'did') result.did = val;
+                else if (key === 'appver') result.appver = val;
+                else if (key === 'mod') result.mod = val;
             }
             return result;
         }
@@ -257,12 +259,17 @@
             var f_uid = document.getElementById('acc_userId_' + index);
             var f_egid = document.getElementById('acc_egid_' + index);
             var f_did = document.getElementById('acc_did_' + index);
+            var f_appver = document.getElementById('acc_appver_' + index);
+            var f_mod = document.getElementById('acc_mod_' + index);
             if (parsed.api_st && f_api) f_api.value = parsed.api_st;
             if (parsed.userId && f_uid) f_uid.value = parsed.userId;
             if (parsed.egid && f_egid) f_egid.value = parsed.egid;
             if (parsed.did && f_did) f_did.value = parsed.did;
+            if (parsed.appver && f_appver) f_appver.value = parsed.appver;
+            if (parsed.mod && f_mod) f_mod.value = parsed.mod;
             if (parsed.api_st) {
-                showToast('已自动提取 ' + (parsed.api_st ? 1 : 0) + ' 个字段', 'success');
+                var count = (parsed.api_st ? 1 : 0) + (parsed.userId ? 1 : 0) + (parsed.egid ? 1 : 0) + (parsed.did ? 1 : 0) + (parsed.appver ? 1 : 0) + (parsed.mod ? 1 : 0);
+                showToast('已自动提取 ' + count + ' 个字段', 'success');
             } else {
                 showToast('未能从 Cookie 中提取到 api_st，请检查格式', 'error');
             }
@@ -363,6 +370,14 @@
                     + '    <label>did <span class="hint">(设备ID)</span></label>'
                     + '    <input id="acc_did_' + index + '" value="' + (acc.did || '') + '" placeholder="ANDROID_f4b70...">'
                     + '  </div>'
+                    + '  <div class="form-group">'
+                    + '    <label>appver <span class="hint">(App版本号, 自动提取)</span></label>'
+                    + '    <input id="acc_appver_' + index + '" value="' + (acc.appver || '') + '" placeholder="如 13.11.10.10928">'
+                    + '  </div>'
+                    + '  <div class="form-group">'
+                    + '    <label>mod <span class="hint">(设备型号, 自动提取)</span></label>'
+                    + '    <input id="acc_mod_' + index + '" value="' + (acc.mod || '') + '" placeholder="如 Xiaomi%28MI+8+Lite%29">'
+                    + '  </div>'
                     + '</div>'
                     + '<div class="device-row">'
                     + '  <div class="form-group" style="margin-bottom:0;">'
@@ -387,7 +402,7 @@
         }
 
         function addAccount() {
-            config.accounts.push({ api_st: '', userId: '', egid: '', did: '', rawCookie: '', deviceId: '' });
+            config.accounts.push({ api_st: '', userId: '', egid: '', did: '', appver: '', mod: '', rawCookie: '', deviceId: '' });
             render();
         }
 
@@ -412,12 +427,16 @@
                 var f3 = document.getElementById('acc_egid_' + index);
                 var f4 = document.getElementById('acc_did_' + index);
                 var f5 = document.getElementById('acc_device_' + index);
+                var f6 = document.getElementById('acc_appver_' + index);
+                var f7 = document.getElementById('acc_mod_' + index);
                 if (rc) acc.rawCookie = rc.value;
                 if (f1) acc.api_st = f1.value;
                 if (f2) acc.userId = f2.value;
                 if (f3) acc.egid = f3.value;
                 if (f4) acc.did = f4.value;
                 if (f5) acc.deviceId = f5.value;
+                if (f6) acc.appver = f6.value;
+                if (f7) acc.mod = f7.value;
             });
         }
 

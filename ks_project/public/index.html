@@ -3,220 +3,466 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>快手金币助手控制台</title>
+    <title>快手金币助手</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        h1, h2 { color: #333; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
-        input, select, textarea { width: 100%; padding: 8px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        button { background-color: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; }
-        button:hover { background-color: #0056b3; }
-        button.stop { background-color: #dc3545; }
-        button.stop:hover { background-color: #a71d2a; }
-        .account-item { border: 1px solid #eee; padding: 15px; margin-bottom: 10px; border-radius: 4px; background: #fafafa; }
-        .status-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 12px; margin-left: 10px; }
-        .running { background-color: #28a745; color: white; }
-        .stopped { background-color: #6c757d; color: white; }
-        .row { display: flex; gap: 10px; align-items: center; }
-        .flex-grow { flex-grow: 1; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header {
+            text-align: center;
+            padding: 30px 0 20px;
+            color: white;
+        }
+        .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
+        .header p { opacity: 0.85; font-size: 14px; }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.12);
+        }
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a2e;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .form-group { margin-bottom: 16px; }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 6px;
+        }
+        .form-group .hint {
+            font-size: 11px;
+            color: #999;
+            font-weight: 400;
+            margin-left: 4px;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #e8e8e8;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            outline: none;
+            font-family: inherit;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+        }
+        textarea { resize: vertical; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; }
+        .row { display: flex; gap: 12px; }
+        .row > * { flex: 1; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102,126,234,0.4); }
+        .btn-success { background: linear-gradient(135deg, #11998e, #38ef7d); color: white; }
+        .btn-success:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(17,153,142,0.4); }
+        .btn-danger { background: linear-gradient(135deg, #eb3349, #f45c43); color: white; }
+        .btn-danger:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(235,51,73,0.4); }
+        .btn-outline {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        .btn-outline:hover { background: #667eea; color: white; }
+        .btn-sm { padding: 6px 14px; font-size: 12px; }
+        .btn-block { width: 100%; }
+        .account-card {
+            border: 2px solid #f0f0f0;
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 16px;
+            background: #fafbff;
+            transition: border-color 0.2s;
+        }
+        .account-card:hover { border-color: #667eea; }
+        .account-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .account-header h3 { font-size: 16px; color: #1a1a2e; }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-running { background: #d4edda; color: #155724; }
+        .status-stopped { background: #e9ecef; color: #6c757d; }
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .status-running .status-dot { background: #28a745; animation: pulse 1.5s infinite; }
+        .status-stopped .status-dot { background: #6c757d; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .parse-section {
+            background: linear-gradient(135deg, #f8f9ff, #f0f2ff);
+            border: 2px dashed #c5cae9;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .parse-section label { color: #3949ab; }
+        .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .device-row { display: flex; gap: 12px; align-items: flex-end; margin-top: 8px; }
+        .device-row > :first-child { flex: 1; }
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+            z-index: 999;
+            transform: translateX(120%);
+            transition: transform 0.3s;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        .toast.show { transform: translateX(0); }
+        .toast-success { background: linear-gradient(135deg, #11998e, #38ef7d); }
+        .toast-error { background: linear-gradient(135deg, #eb3349, #f45c43); }
+        .toast-info { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .info-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #856404;
+            margin-bottom: 16px;
+            line-height: 1.6;
+        }
     </style>
 </head>
 <body>
-    <h1>🚀 快手金币助手控制台</h1>
+    <div class="container">
+        <div class="header">
+            <h1>快手金币助手</h1>
+            <p>自动完成任务赚取金币 | 本地签名服务</p>
+        </div>
 
-    <div class="card">
-        <h2>全局配置</h2>
-        <div class="row">
-            <div class="flex-grow">
-                <label>任务类型 (Task)</label>
-                <select id="common_Task">
-                    <option value="all">全部 (all)</option>
-                    <option value="food">饭补 (food)</option>
-                    <option value="box">宝箱 (box)</option>
-                    <option value="look">逛街 (look)</option>
-                </select>
+        <div class="card">
+            <div class="card-title">全局配置</div>
+            <div class="row">
+                <div class="form-group">
+                    <label>任务类型</label>
+                    <select id="common_Task">
+                        <option value="all">全部 (饭补+宝箱)</option>
+                        <option value="food">仅饭补</option>
+                        <option value="box">仅宝箱</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>运行轮数</label>
+                    <input type="number" id="common_ROUNDS" placeholder="40">
+                </div>
             </div>
-            <div class="flex-grow">
-                <label>金币上限 (COIN_LIMIT)</label>
-                <input type="number" id="common_COIN_LIMIT">
+            <div class="row">
+                <div class="form-group">
+                    <label>金币上限</label>
+                    <input type="number" id="common_COIN_LIMIT" placeholder="550000">
+                </div>
+                <div class="form-group">
+                    <label>低奖励阈值</label>
+                    <input type="number" id="common_LOW_REWARD_THRESHOLD" placeholder="200">
+                </div>
             </div>
+            <button class="btn btn-primary" onclick="saveConfig()">保存配置</button>
         </div>
-        <div class="row">
-            <div class="flex-grow">
-                <label>运行轮数 (ROUNDS)</label>
-                <input type="number" id="common_ROUNDS">
+
+        <div class="card">
+            <div class="card-title">账号管理</div>
+            <div class="info-box">
+                <b>如何获取参数：</b>使用抓包工具（如 HttpCanary）打开快手极速版，在任意请求的 Cookie 中找到以下字段。<br>
+                <b>快捷方式：</b>可直接粘贴完整 Cookie 字符串，系统会自动提取所需字段。
             </div>
-            <div class="flex-grow">
-                <label>低奖励阈值</label>
-                <input type="number" id="common_LOW_REWARD_THRESHOLD">
-            </div>
+            <div id="accountsList"></div>
+            <button class="btn btn-outline" onclick="addAccount()" style="margin-top:8px;">+ 添加账号</button>
         </div>
-        <button onclick="saveConfig()">💾 保存全局配置</button>
     </div>
 
-    <div class="card">
-        <h2>账号管理</h2>
-        <div id="accountsList"></div>
-        <button onclick="addAccount()">➕ 添加账号</button>
-    </div>
+    <div id="toast" class="toast"></div>
 
     <script>
-        let config = { accounts: [], common: {} };
-        let devices = [];
-        let runningStatus = {};
+        var config = { accounts: [], common: {} };
+        var devices = [];
+        var runningStatus = {};
+
+        function showToast(msg, type) {
+            var t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast toast-' + (type || 'info') + ' show';
+            setTimeout(function() { t.className = 'toast'; }, 2500);
+        }
+
+        function parseCookieString(cookieStr) {
+            var result = { api_st: '', userId: '', egid: '', did: '' };
+            if (!cookieStr) return result;
+            cookieStr = cookieStr.replace(/\s+/g, ' ').trim();
+            var pairs = cookieStr.split(/;\s*/);
+            for (var i = 0; i < pairs.length; i++) {
+                var eqIdx = pairs[i].indexOf('=');
+                if (eqIdx < 0) continue;
+                var key = pairs[i].substring(0, eqIdx).trim();
+                var val = pairs[i].substring(eqIdx + 1).trim();
+                if (key === 'kuaishou.api_st') result.api_st = val;
+                else if (key === 'userId' || key === 'ud') result.userId = result.userId || val;
+                else if (key === 'egid') result.egid = val;
+                else if (key === 'did') result.did = val;
+            }
+            return result;
+        }
+
+        function autoParseCookie(index) {
+            var textarea = document.getElementById('acc_rawcookie_' + index);
+            if (!textarea) return;
+            var parsed = parseCookieString(textarea.value);
+            var f_api = document.getElementById('acc_api_st_' + index);
+            var f_uid = document.getElementById('acc_userId_' + index);
+            var f_egid = document.getElementById('acc_egid_' + index);
+            var f_did = document.getElementById('acc_did_' + index);
+            if (parsed.api_st && f_api) f_api.value = parsed.api_st;
+            if (parsed.userId && f_uid) f_uid.value = parsed.userId;
+            if (parsed.egid && f_egid) f_egid.value = parsed.egid;
+            if (parsed.did && f_did) f_did.value = parsed.did;
+            if (parsed.api_st) {
+                showToast('已自动提取 ' + (parsed.api_st ? 1 : 0) + ' 个字段', 'success');
+            } else {
+                showToast('未能从 Cookie 中提取到 api_st，请检查格式', 'error');
+            }
+        }
 
         async function init() {
             await Promise.all([loadConfig(), loadDevices(), loadStatus()]);
             render();
-            // 轮询状态
             setInterval(loadStatus, 3000);
         }
 
         async function loadConfig() {
-            const res = await fetch('/api/config');
+            var res = await fetch('/api/config');
             config = await res.json();
-            
-            // 填充全局配置
-            document.getElementById('common_Task').value = config.common.Task;
-            document.getElementById('common_COIN_LIMIT').value = config.common.COIN_LIMIT;
-            document.getElementById('common_ROUNDS').value = config.common.ROUNDS;
-            document.getElementById('common_LOW_REWARD_THRESHOLD').value = config.common.LOW_REWARD_THRESHOLD;
+            document.getElementById('common_Task').value = config.common.Task || 'all';
+            document.getElementById('common_COIN_LIMIT').value = config.common.COIN_LIMIT || 550000;
+            document.getElementById('common_ROUNDS').value = config.common.ROUNDS || 40;
+            document.getElementById('common_LOW_REWARD_THRESHOLD').value = config.common.LOW_REWARD_THRESHOLD || 200;
         }
 
         async function loadDevices() {
-            const res = await fetch('/api/devices');
+            var res = await fetch('/api/devices');
             devices = await res.json();
         }
 
         async function loadStatus() {
-            const res = await fetch('/api/status');
+            var res = await fetch('/api/status');
             runningStatus = await res.json();
             updateStatusBadges();
         }
 
         function updateStatusBadges() {
-            config.accounts.forEach((_, index) => {
-                const badge = document.getElementById(`status-${index}`);
-                const btn = document.getElementById(`btn-${index}`);
-                if (badge && btn) {
-                    const isRunning = runningStatus[index];
-                    badge.className = `status-badge ${isRunning ? 'running' : 'stopped'}`;
-                    badge.innerText = isRunning ? '运行中' : '已停止';
-                    
-                    btn.className = isRunning ? 'stop' : '';
-                    btn.innerText = isRunning ? '停止' : '启动';
-                    btn.onclick = () => toggleTask(index, isRunning);
+            config.accounts.forEach(function(_, index) {
+                var badge = document.getElementById('status-' + index);
+                var startBtn = document.getElementById('btn-start-' + index);
+                var stopBtn = document.getElementById('btn-stop-' + index);
+                if (!badge) return;
+                var isRunning = runningStatus[index];
+                if (isRunning) {
+                    badge.className = 'status-badge status-running';
+                    badge.innerHTML = '<span class="status-dot"></span> 运行中';
+                } else {
+                    badge.className = 'status-badge status-stopped';
+                    badge.innerHTML = '<span class="status-dot"></span> 已停止';
                 }
+                if (startBtn) startBtn.style.display = isRunning ? 'none' : '';
+                if (stopBtn) stopBtn.style.display = isRunning ? '' : 'none';
             });
         }
 
         function render() {
-            const list = document.getElementById('accountsList');
+            var list = document.getElementById('accountsList');
             list.innerHTML = '';
 
-            config.accounts.forEach((acc, index) => {
-                const div = document.createElement('div');
-                div.className = 'account-item';
-                
-                // 构造设备选项
-                const deviceOptions = devices.map(d => `<option value="${d}">${d}</option>`).join('');
-                
-                div.innerHTML = `
-                    <div class="row" style="margin-bottom: 10px;">
-                        <h3>账号 #${index + 1}</h3>
-                        <span id="status-${index}" class="status-badge stopped">已停止</span>
-                        <div style="margin-left: auto;">
-                            <button onclick="deleteAccount(${index})" style="background:#dc3545; padding: 5px 10px;">删除</button>
-                        </div>
-                    </div>
-                    
-                    <label>Cookie (ks)</label>
-                    <textarea id="acc_cookie_${index}" rows="2">${acc.cookie || ''}</textarea>
-                    
-                    <div class="row">
-                        <div class="flex-grow">
-                            <label>Client ID (cid)</label>
-                            <input id="acc_cid_${index}" value="${acc.cid || ''}">
-                        </div>
-                        <div class="flex-grow">
-                            <label>Secret ID (sid)</label>
-                            <input id="acc_sid_${index}" value="${acc.sid || ''}">
-                        </div>
-                    </div>
+            config.accounts.forEach(function(acc, index) {
+                var div = document.createElement('div');
+                div.className = 'account-card';
 
-                    <div class="row">
-                        <div class="flex-grow">
-                            <label>运行设备</label>
-                            <select id="acc_device_${index}">
-                                ${devices.length > 0 ? deviceOptions : '<option>未检测到设备</option>'}
-                            </select>
-                        </div>
-                        <div class="flex-grow">
-                            <label>&nbsp;</label>
-                            <button id="btn-${index}" onclick="toggleTask(${index}, false)" style="width:100%">启动</button>
-                        </div>
-                    </div>
-                `;
+                var deviceOptions = '';
+                for (var i = 0; i < devices.length; i++) {
+                    deviceOptions += '<option value="' + devices[i] + '">' + devices[i] + '</option>';
+                }
+                if (devices.length === 0) {
+                    deviceOptions = '<option value="">未检测到设备</option>';
+                }
+
+                var selectedDevice = acc.deviceId || '';
+
+                div.innerHTML = ''
+                    + '<div class="account-header">'
+                    + '  <div style="display:flex;align-items:center;gap:10px;">'
+                    + '    <h3>账号 #' + (index + 1) + '</h3>'
+                    + '    <span id="status-' + index + '" class="status-badge status-stopped"><span class="status-dot"></span> 已停止</span>'
+                    + '  </div>'
+                    + '  <button class="btn btn-danger btn-sm" onclick="deleteAccount(' + index + ')">删除</button>'
+                    + '</div>'
+                    + '<div class="parse-section">'
+                    + '  <div class="form-group" style="margin-bottom:8px;">'
+                    + '    <label>粘贴完整 Cookie <span class="hint">(自动提取所需字段)</span></label>'
+                    + '    <textarea id="acc_rawcookie_' + index + '" rows="3" placeholder="从抓包工具中复制完整的 Cookie 字符串粘贴到这里...">' + (acc.rawCookie || '') + '</textarea>'
+                    + '  </div>'
+                    + '  <button class="btn btn-outline btn-sm" onclick="autoParseCookie(' + index + ')">自动提取</button>'
+                    + '</div>'
+                    + '<div class="field-grid">'
+                    + '  <div class="form-group">'
+                    + '    <label>kuaishou.api_st <span class="hint">(登录凭证)</span></label>'
+                    + '    <input id="acc_api_st_' + index + '" value="' + (acc.api_st || '') + '" placeholder="Cg9rdWFpc2hvdS5...">'
+                    + '  </div>'
+                    + '  <div class="form-group">'
+                    + '    <label>userId <span class="hint">(用户ID)</span></label>'
+                    + '    <input id="acc_userId_' + index + '" value="' + (acc.userId || '') + '" placeholder="如 1788284763">'
+                    + '  </div>'
+                    + '  <div class="form-group">'
+                    + '    <label>egid <span class="hint">(设备指纹)</span></label>'
+                    + '    <input id="acc_egid_' + index + '" value="' + (acc.egid || '') + '" placeholder="DFP7AE5F78D...">'
+                    + '  </div>'
+                    + '  <div class="form-group">'
+                    + '    <label>did <span class="hint">(设备ID)</span></label>'
+                    + '    <input id="acc_did_' + index + '" value="' + (acc.did || '') + '" placeholder="ANDROID_f4b70...">'
+                    + '  </div>'
+                    + '</div>'
+                    + '<div class="device-row">'
+                    + '  <div class="form-group" style="margin-bottom:0;">'
+                    + '    <label>运行设备 (ADB)</label>'
+                    + '    <select id="acc_device_' + index + '">'
+                    + '      ' + deviceOptions
+                    + '    </select>'
+                    + '  </div>'
+                    + '  <button id="btn-start-' + index + '" class="btn btn-success" onclick="toggleTask(' + index + ', false)">启动</button>'
+                    + '  <button id="btn-stop-' + index + '" class="btn btn-danger" onclick="toggleTask(' + index + ', true)" style="display:none;">停止</button>'
+                    + '</div>';
+
                 list.appendChild(div);
+
+                if (selectedDevice) {
+                    var sel = document.getElementById('acc_device_' + index);
+                    if (sel) sel.value = selectedDevice;
+                }
             });
+
+            updateStatusBadges();
         }
 
         function addAccount() {
-            config.accounts.push({ cookie: "", cid: "", sid: "", phid: "" });
+            config.accounts.push({ api_st: '', userId: '', egid: '', did: '', rawCookie: '', deviceId: '' });
             render();
-            saveConfig();
         }
 
         async function deleteAccount(index) {
-            if (confirm('确定删除该账号配置吗？')) {
+            if (confirm('确定删除该账号配置吗?')) {
                 config.accounts.splice(index, 1);
                 await saveConfig();
                 render();
             }
         }
 
-        async function saveConfig() {
-            // 更新 common
+        function collectFormData() {
             config.common.Task = document.getElementById('common_Task').value;
-            config.common.COIN_LIMIT = parseInt(document.getElementById('common_COIN_LIMIT').value);
-            config.common.ROUNDS = parseInt(document.getElementById('common_ROUNDS').value);
-            config.common.LOW_REWARD_THRESHOLD = parseInt(document.getElementById('common_LOW_REWARD_THRESHOLD').value);
+            config.common.COIN_LIMIT = parseInt(document.getElementById('common_COIN_LIMIT').value) || 550000;
+            config.common.ROUNDS = parseInt(document.getElementById('common_ROUNDS').value) || 40;
+            config.common.LOW_REWARD_THRESHOLD = parseInt(document.getElementById('common_LOW_REWARD_THRESHOLD').value) || 200;
 
-            // 更新 accounts
-            config.accounts.forEach((_, index) => {
-                config.accounts[index].cookie = document.getElementById(`acc_cookie_${index}`).value;
-                config.accounts[index].cid = document.getElementById(`acc_cid_${index}`).value;
-                config.accounts[index].sid = document.getElementById(`acc_sid_${index}`).value;
-                // phid 暂不显示，保留原值
+            config.accounts.forEach(function(acc, index) {
+                var rc = document.getElementById('acc_rawcookie_' + index);
+                var f1 = document.getElementById('acc_api_st_' + index);
+                var f2 = document.getElementById('acc_userId_' + index);
+                var f3 = document.getElementById('acc_egid_' + index);
+                var f4 = document.getElementById('acc_did_' + index);
+                var f5 = document.getElementById('acc_device_' + index);
+                if (rc) acc.rawCookie = rc.value;
+                if (f1) acc.api_st = f1.value;
+                if (f2) acc.userId = f2.value;
+                if (f3) acc.egid = f3.value;
+                if (f4) acc.did = f4.value;
+                if (f5) acc.deviceId = f5.value;
             });
+        }
 
+        async function saveConfig() {
+            collectFormData();
             await fetch('/api/config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(config)
             });
-            alert('配置已保存');
+            showToast('配置已保存', 'success');
         }
 
         async function toggleTask(index, isRunning) {
+            collectFormData();
             if (isRunning) {
                 await fetch('/api/stop', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ accountIndex: index })
                 });
+                showToast('任务已停止', 'info');
             } else {
-                // 先保存当前输入
-                config.accounts[index].cookie = document.getElementById(`acc_cookie_${index}`).value;
-                await saveConfig(); // 确保后端拿到最新配置
-
-                const deviceId = document.getElementById(`acc_device_${index}`).value;
-                await fetch('/api/run', {
+                var acc = config.accounts[index];
+                if (!acc.api_st || !acc.userId || !acc.did) {
+                    showToast('请填写 api_st、userId、did 后再启动', 'error');
+                    return;
+                }
+                await saveConfig();
+                var deviceId = document.getElementById('acc_device_' + index).value;
+                if (!deviceId) {
+                    showToast('未检测到设备，请检查 ADB 连接', 'error');
+                    return;
+                }
+                var res = await fetch('/api/run', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ accountIndex: index, deviceId: deviceId })
                 });
+                var data = await res.json();
+                if (data.error) {
+                    showToast(data.error, 'error');
+                } else {
+                    showToast('任务已启动', 'success');
+                }
             }
             loadStatus();
         }

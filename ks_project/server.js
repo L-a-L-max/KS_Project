@@ -75,22 +75,18 @@ app.post('/api/run', (req, res) => {
     if (!account) return res.status(404).json({ error: 'Account not found' });
     if (runningProcesses[accountIndex]) return res.status(400).json({ error: 'Task already running' });
 
-    // 构造环境变量
     const env = {
         ...process.env,
-        // 脚本需要的变量
-        ks: account.cookie,
-        u: `http://127.0.0.1:5000`, // 指向本地签名服务
-        cid: account.cid || '',
-        sid: account.sid || '',
-        phid: account.phid || '',
-        Task: config.common.Task,
-        COIN_LIMIT: String(config.common.COIN_LIMIT),
-        ROUNDS: String(config.common.ROUNDS),
-        LOW_REWARD_THRESHOLD: String(config.common.LOW_REWARD_THRESHOLD),
-        LOW_REWARD_LIMIT: String(config.common.LOW_REWARD_LIMIT),
-        
-        // 传递给脚本识别设备ID，脚本请求签名时带上
+        KS_API_ST: account.api_st || '',
+        KS_UID: account.userId || '',
+        KS_EGID: account.egid || '',
+        KS_DID: account.did || '',
+        u: 'http://127.0.0.1:5000',
+        Task: config.common.Task || 'all',
+        COIN_LIMIT: String(config.common.COIN_LIMIT || 550000),
+        ROUNDS: String(config.common.ROUNDS || 40),
+        LOW_REWARD_THRESHOLD: String(config.common.LOW_REWARD_THRESHOLD || 200),
+        LOW_REWARD_LIMIT: String(config.common.LOW_REWARD_LIMIT || 3),
         DEVICE_ID: deviceId
     };
 

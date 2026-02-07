@@ -10,27 +10,24 @@ if (!DEVICE_ID) {
     process.exit(1);
 }
 
-const COOKIE = process.env.ks;
-if (!COOKIE) {
-    console.error("错误: 未找到 Cookie (环境变量 ks)");
+var FANS_SALT = '772867c19925';
+
+var api_st = process.env.KS_API_ST || '';
+var uid = process.env.KS_UID || '';
+var egid = process.env.KS_EGID || '';
+var did = process.env.KS_DID || '';
+var salt = FANS_SALT;
+
+if (!api_st || !uid || !did) {
+    console.error('错误: 缺少必要参数 (KS_API_ST, KS_UID, KS_DID)');
     process.exit(1);
 }
 
-const Task = process.env.Task || 'all';
-const COIN_LIMIT = parseInt(process.env.COIN_LIMIT || 550000);
-const ROUNDS = parseInt(process.env.ROUNDS || 40);
-const LOW_REWARD_THRESHOLD = parseInt(process.env.LOW_REWARD_THRESHOLD || 200);
-const LOW_REWARD_LIMIT = parseInt(process.env.LOW_REWARD_LIMIT || 3);
-
-const ckParts = COOKIE.split('#');
-if (ckParts.length < 5) {
-    console.error("Cookie 格式不正确，应为: salt#kuaishou.api_st=...#uid#egid#did");
-}
-const salt = ckParts[0];
-const api_st = ckParts[1] ? ckParts[1].replace('kuaishou.api_st=', '') : '';
-const uid = ckParts[2];
-const egid = ckParts[3];
-const did = ckParts[4];
+var Task = process.env.Task || 'all';
+var COIN_LIMIT = parseInt(process.env.COIN_LIMIT || 550000);
+var ROUNDS = parseInt(process.env.ROUNDS || 40);
+var LOW_REWARD_THRESHOLD = parseInt(process.env.LOW_REWARD_THRESHOLD || 200);
+var LOW_REWARD_LIMIT = parseInt(process.env.LOW_REWARD_LIMIT || 3);
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -295,7 +292,7 @@ async function start() {
     console.log('开始运行任务');
     console.log('设备ID: ' + DEVICE_ID);
     console.log('任务类型: ' + Task + ', 轮数: ' + ROUNDS);
-    console.log('Cookie字段: salt=' + (salt ? 'ok' : 'empty') + ', api_st=' + (api_st ? api_st.substring(0, 10) + '...' : 'empty') + ', uid=' + uid + ', egid=' + (egid ? egid.substring(0, 10) + '...' : 'empty') + ', did=' + did);
+    console.log('参数: api_st=' + (api_st ? api_st.substring(0, 10) + '...' : 'empty') + ', uid=' + uid + ', egid=' + (egid ? egid.substring(0, 10) + '...' : 'empty') + ', did=' + did + ', salt=' + salt);
 
     var user = new UserInfo();
 

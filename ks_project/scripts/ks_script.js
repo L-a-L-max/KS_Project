@@ -204,12 +204,7 @@ class UserInfo {
 
         var postData = 'encData=' + encodeURIComponent(currentEnc)
             + '&sign=' + encodeURIComponent(currentSign)
-            + '&cs=false'
-            + '&client_key=2ac2a76d'
-            + '&videoModelCrowdTag='
-            + '&os=android'
-            + '&kuaishou.api_st=' + encodeURIComponent(api_st)
-            + '&uQaTag=';
+            + '&client_key=2ac2a76d';
 
         var adPath = '/rest/e/reward/mixed/ad';
 
@@ -231,7 +226,10 @@ class UserInfo {
                 + '&__NS_xfalcon='
                 + '&__NStokensig=' + sigToken;
 
-            console.log('[广告请求] type=' + type + ', postData长度=' + postData.length);
+            console.log('[广告请求] type=' + type);
+            console.log('[广告请求] URL: ' + fullUrl.substring(0, 120) + '...');
+            console.log('[广告请求] encData前40字符: ' + currentEnc.substring(0, 40));
+            console.log('[广告请求] sign值: ' + currentSign);
 
             var options = {
                 method: 'post',
@@ -241,6 +239,7 @@ class UserInfo {
             };
 
             var result = await httpRequest(options, 'getTaskInfo');
+            console.log('[广告响应] ' + JSON.stringify(result).substring(0, 300));
 
             if (result.errorMsg == 'OK') {
                 try {
@@ -262,9 +261,13 @@ class UserInfo {
                     console.log('解析任务数据异常: ' + e.message);
                 }
             } else {
-                console.log('获取任务失败: ' + (result.errorMsg || JSON.stringify(result)));
+                console.log('获取任务失败: result=' + result.result + ', errorMsg=' + result.errorMsg + ', error_msg=' + result.error_msg);
                 if (result.result === 50) {
                     console.log('[调试] 签名验证失败 - 可能原因: api_st过期/参数不匹配');
+                }
+                if (result.result === 6001) {
+                    console.log('[调试] 6001错误 - 可能原因: encData内容无效/api_st过期/账号需要激活');
+                    console.log('[调试] 请检查: 1.api_st是否过期 2.快手账号是否正常 3.是否需要重新抓包');
                 }
             }
         } catch (e) {
